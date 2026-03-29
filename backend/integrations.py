@@ -1,8 +1,7 @@
 import imaplib
-import smtplib
 import email
 import socket
-from email.mime.text import MIMEText
+import resend
 from email.header import decode_header
 import os
 import asyncio
@@ -15,17 +14,20 @@ load_dotenv()
 class MailClient:
     def __init__(self):
         self.imap_server = os.getenv("EMAIL_IMAP_SERVER", "imap.gmail.com")
-        self.smtp_server = os.getenv("EMAIL_SMTP_SERVER", "smtp.gmail.com")
         self.email_user = os.getenv("EMAIL_USER", "")
-        self.email_pass = os.getenv("EMAIL_PASS", "") # App Password
+        self.email_pass = os.getenv("EMAIL_PASS", "") # App Password (for IMAP)
+        self.resend_api_key = os.getenv("RESEND_API_KEY", "")
         self.last_error = None
         
+        if self.resend_api_key:
+            resend.api_key = self.resend_api_key
+        
     def is_configured(self):
-        return bool(self.email_user and self.email_pass)
+        return bool(self.email_user and self.email_pass and self.resend_api_key)
 
     def get_new_emails(self) -> List[Dict]:
         """Poll the inbox for unread HR emails."""
-        if not self.is_configured():
+        if not (self.email_user and self.email_pass):
             return []
             
         for attempt in range(3): # Try up to 3 times
@@ -78,7 +80,7 @@ class MailClient:
                 else:
                     content = msg.get_payload(decode=True).decode(msg.get_content_charset() or 'utf-8')
                 
-                # Basic Cleanup: Strip excessive whitespace and long URLs to keep it readable
+                # Basic Cleanup
                 content = "\n".join([line.strip() for line in content.splitlines() if line.strip()])
                 if len(content) > 500:
                     content = content[:500] + "... [Content Truncated]"
@@ -100,30 +102,32 @@ class MailClient:
             return []
 
     def send_email(self, to_email: str, subject: str, body: str):
-        """Send a general email notification."""
-        if not self.email_user or not self.email_pass:
-            print(f"SMTP Mock: Not sending mail to {to_email}. Credentials missing.")
+        """Send an email using Resend (HTTP API)."""
+        if not self.resend_api_key:
+            print(f"Resend Error: API Key missing. Not sending mail to {to_email}.")
             return
 
         try:
-            msg = MIMEText(body)
-            msg["Subject"] = subject
-            msg["From"] = self.email_user
-            msg["To"] = to_email
+            # Determine from address. If the user has a verified domain,
+            # they should update this. Defaulting to onboarding@resend.dev.
+            from_email = "onboarding@resend.dev"
             
-            print(f"SMTP: Connecting to {self.smtp_server}:587 for recipient {to_email}...")
-            with smtplib.SMTP(self.smtp_server, 587, timeout=15) as server:
-                server.starttls() # Secure the connection
-                server.login(self.email_user, self.email_pass)
-                server.send_message(msg)
-            print(f"SMTP: Successfully sent email to {to_email}")
+            # If the user's email is on their own domain and verified, use it.
+            # For now, we'll prefix with 'onboarding' for safety in testing.
             
-        except smtplib.SMTPAuthenticationError:
-            print("SMTP Error: Authentication failed. Please check your App Password.")
-        except smtplib.SMTPConnectError:
-            print("SMTP Error: Failed to connect to the mail server.")
+            params = {
+                "from": from_email,
+                "to": to_email,
+                "subject": subject,
+                "text": body,
+            }
+
+            print(f"RESEND: Attempting to send email via HTTP API to {to_email}...")
+            response = resend.Emails.send(params)
+            print(f"RESEND: Successfully sent email. ID: {response.get('id', 'Unknown')}")
+            
         except Exception as e:
-            print(f"SMTP Error: {type(e).__name__}: {e}")
+            print(f"RESEND Error: {type(e).__name__}: {e}")
 
     def send_reply(self, to_email: str, subject: str, body: str):
         """Send an automated HR response."""
