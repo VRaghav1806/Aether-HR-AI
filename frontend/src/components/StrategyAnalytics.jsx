@@ -10,7 +10,7 @@ function StrategyAnalytics() {
 
   const fetchAnalytics = async () => {
     try {
-      const res = await fetch("${import.meta.env.VITE_API_URL}/analytics");
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/analytics`);
       const result = await res.json();
       setData(result);
     } catch (err) {

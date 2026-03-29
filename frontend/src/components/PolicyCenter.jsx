@@ -15,7 +15,7 @@ const PolicyCenter = () => {
 
   const fetchPolicies = async () => {
     try {
-      const response = await fetch("${import.meta.env.VITE_API_URL}/policies");
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/policies`);
       const data = await response.json();
       setPolicies(data);
       setLoading(false);
@@ -38,7 +38,7 @@ const PolicyCenter = () => {
 
   const handleSave = async () => {
     const method = editingPolicy ? 'PUT' : 'POST';
-    const url = editingPolicy ? `${import.meta.env.VITE_API_URL}/policies/${editingPolicy.id}` : '${import.meta.env.VITE_API_URL}/policies';
+    const url = editingPolicy ? `${import.meta.env.VITE_API_URL}/policies/${editingPolicy.id}` : `${import.meta.env.VITE_API_URL}/policies`;
 
     try {
       const response = await fetch(url, {

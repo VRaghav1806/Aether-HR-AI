@@ -6,7 +6,7 @@ function EmployeeAnalytics() {
 
   const fetchEmployees = async () => {
     try {
-      const res = await fetch("${import.meta.env.VITE_API_URL}/employees");
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/employees`);
       const data = await res.json();
       setEmployees(data);
     } catch (err) {
