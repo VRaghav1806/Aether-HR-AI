@@ -111,13 +111,18 @@ class MailClient:
             msg["From"] = self.email_user
             msg["To"] = to_email
             
-            with smtplib.SMTP_SSL(self.smtp_server, 465) as server:
+            with smtplib.SMTP(self.smtp_server, 587, timeout=15) as server:
+                server.starttls() # Secure the connection
                 server.login(self.email_user, self.email_pass)
                 server.send_message(msg)
             print(f"SMTP: Successfully sent email to {to_email}")
             
+        except smtplib.SMTPAuthenticationError:
+            print("SMTP Error: Authentication failed. Please check your App Password.")
+        except smtplib.SMTPConnectError:
+            print("SMTP Error: Failed to connect to the mail server.")
         except Exception as e:
-            print(f"SMTP Error: {e}")
+            print(f"SMTP Error: {type(e).__name__}: {e}")
 
     def send_reply(self, to_email: str, subject: str, body: str):
         """Send an automated HR response."""
