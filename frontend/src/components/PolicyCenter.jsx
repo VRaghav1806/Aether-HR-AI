@@ -15,7 +15,7 @@ const PolicyCenter = () => {
 
   const fetchPolicies = async () => {
     try {
-      const response = await fetch("http://127.0.0.1:8000/policies");
+      const response = await fetch("${import.meta.env.VITE_API_URL}/policies");
       const data = await response.json();
       setPolicies(data);
       setLoading(false);
@@ -38,7 +38,7 @@ const PolicyCenter = () => {
 
   const handleSave = async () => {
     const method = editingPolicy ? 'PUT' : 'POST';
-    const url = editingPolicy ? `http://127.0.0.1:8000/policies/${editingPolicy.id}` : 'http://127.0.0.1:8000/policies';
+    const url = editingPolicy ? `${import.meta.env.VITE_API_URL}/policies/${editingPolicy.id}` : '${import.meta.env.VITE_API_URL}/policies';
 
     try {
       const response = await fetch(url, {
@@ -58,7 +58,7 @@ const PolicyCenter = () => {
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this policy?")) return;
     try {
-      const response = await fetch(`http://127.0.0.1:8000/policies/${id}`, { method: 'DELETE' });
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/policies/${id}`, { method: 'DELETE' });
       if (response.ok) fetchPolicies();
     } catch (err) {
       console.error("Error deleting policy:", err);

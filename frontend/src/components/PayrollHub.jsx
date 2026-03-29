@@ -5,7 +5,7 @@ const PayrollHub = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://127.0.0.1:8000/expenses')
+    fetch('${import.meta.env.VITE_API_URL}/expenses')
       .then(res => res.json())
       .then(data => {
         setExpenses(data);

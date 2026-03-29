@@ -33,14 +33,14 @@ function App() {
 
   const fetchStatus = async () => {
     try {
-      const res = await fetch("http://127.0.0.1:8000/status");
+      const res = await fetch("${import.meta.env.VITE_API_URL}/status");
       const data = await res.json();
       setAgents(data.agents);
       setMailConnected(data.mail_connected);
       setMailError(data.mail_error);
       setStats({ total_tickets: data.total_tickets, resolved: data.resolved });
       
-      const tRes = await fetch("http://127.0.0.1:8000/tickets");
+      const tRes = await fetch("${import.meta.env.VITE_API_URL}/tickets");
       const tData = await tRes.json();
       setTickets(tData.reverse());
     } catch (err) {
@@ -52,7 +52,7 @@ function App() {
     e.preventDefault();
     setLoading(true);
     try {
-      await fetch(`http://127.0.0.1:8000/tickets?content=${encodeURIComponent(newTicket)}`, {
+      await fetch(`${import.meta.env.VITE_API_URL}/tickets?content=${encodeURIComponent(newTicket)}`, {
         method: "POST"
       });
       setNewTicket("");
