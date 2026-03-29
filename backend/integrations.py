@@ -1,8 +1,8 @@
 import imaplib
+import smtplib
 import email
 import socket
-import sendgrid
-from sendgrid.helpers.mail import Mail, Email, To, Content
+from email.mime.text import MIMEText
 from email.header import decode_header
 import os
 import asyncio
@@ -15,21 +15,17 @@ load_dotenv()
 class MailClient:
     def __init__(self):
         self.imap_server = os.getenv("EMAIL_IMAP_SERVER", "imap.gmail.com")
+        self.smtp_server = os.getenv("EMAIL_SMTP_SERVER", "smtp.gmail.com")
         self.email_user = os.getenv("EMAIL_USER", "")
-        self.email_pass = os.getenv("EMAIL_PASS", "") # App Password (for IMAP)
-        self.sg_api_key = os.getenv("SENDGRID_API_KEY", "")
-        self.sg_sender = os.getenv("SENDGRID_SENDER", "")
+        self.email_pass = os.getenv("EMAIL_PASS", "") # App Password
         self.last_error = None
         
-        if self.sg_api_key:
-            self.sg_client = sendgrid.SendGridAPIClient(api_key=self.sg_api_key)
-        
     def is_configured(self):
-        return bool(self.email_user and self.email_pass and self.sg_api_key and self.sg_sender)
+        return bool(self.email_user and self.email_pass)
 
     def get_new_emails(self) -> List[Dict]:
         """Poll the inbox for unread HR emails."""
-        if not (self.email_user and self.email_pass):
+        if not self.is_configured():
             return []
             
         for attempt in range(3): # Try up to 3 times
@@ -82,7 +78,7 @@ class MailClient:
                 else:
                     content = msg.get_payload(decode=True).decode(msg.get_content_charset() or 'utf-8')
                 
-                # Basic Cleanup
+                # Basic Cleanup: Strip excessive whitespace and long URLs to keep it readable
                 content = "\n".join([line.strip() for line in content.splitlines() if line.strip()])
                 if len(content) > 500:
                     content = content[:500] + "... [Content Truncated]"
@@ -104,27 +100,24 @@ class MailClient:
             return []
 
     def send_email(self, to_email: str, subject: str, body: str):
-        """Send an email using SendGrid (HTTP API)."""
-        if not self.sg_api_key or not self.sg_sender:
-            print(f"SendGrid Error: API Key or Sender missing. Not sending mail to {to_email}.")
+        """Send a general email notification."""
+        if not self.email_user or not self.email_pass:
+            print(f"SMTP Mock: Not sending mail to {to_email}. Credentials missing.")
             return
 
         try:
-            from_email = Email(self.sg_sender)
-            to_email_obj = To(to_email)
-            content = Content("text/plain", body)
-            mail = Mail(from_email, to_email_obj, subject, content)
-
-            print(f"SENDGRID: Attempting to send email via HTTP API to {to_email}...")
-            response = self.sg_client.client.mail.send.post(request_body=mail.get())
+            msg = MIMEText(body)
+            msg["Subject"] = subject
+            msg["From"] = self.email_user
+            msg["To"] = to_email
             
-            if response.status_code >= 200 and response.status_code < 300:
-                print(f"SENDGRID: Successfully sent email. Status: {response.status_code}")
-            else:
-                print(f"SENDGRID Error: Status Code {response.status_code}. Response: {response.body}")
+            with smtplib.SMTP_SSL(self.smtp_server, 465) as server:
+                server.login(self.email_user, self.email_pass)
+                server.send_message(msg)
+            print(f"SMTP: Successfully sent email to {to_email}")
             
         except Exception as e:
-            print(f"SENDGRID Error: {type(e).__name__}: {e}")
+            print(f"SMTP Error: {e}")
 
     def send_reply(self, to_email: str, subject: str, body: str):
         """Send an automated HR response."""

@@ -1,7 +1,6 @@
 import os
 import sys
 import asyncio
-import email.utils
 from datetime import datetime
 from typing import List, Dict
 
@@ -195,7 +194,6 @@ class AgentOrchestrator:
         ticket = next((t for t in self.tickets if t.id == ticket_id), None)
         if not ticket: return
         
-        print(f"--- RESOLVING TICKET: {ticket_id} ---")
         ticket.status = "processing"
         
         # Fetch latest policies and sender info to provide context
@@ -224,21 +222,13 @@ class AgentOrchestrator:
 
             # The Payroll agent now generates the actual reply content
             if agent.type == "Payroll":
-                print(f"PAYROLL OUTPUT for {ticket.id}: {res['output'][:100]}...")
                 # Only send if it's not an AI Error
                 if "AI Error" not in res["output"]:
-                    # Clean the recipient email address
-                    to_name, to_addr = email.utils.parseaddr(ticket.source)
-                    recipient = to_addr if to_addr else ticket.source
-                    
-                    print(f"SMTP: Attempting to send reply to {recipient}...")
                     self.mail_client.send_reply(
-                        to_email=recipient, 
+                        to_email=ticket.source, 
                         subject=f"HR Update: {ticket.category}", 
                         body=f"{res['output']}\n\n---\nAutonomous HR Orchestrator\nAether HR-AI"
                     )
-                else:
-                    print(f"SMTP SKIP: AI Error detected in Payroll output for {ticket.id}.")
             await asyncio.sleep(1)
             
         # Post-Decision Logic: Increment Usage Counters if approved
