@@ -111,6 +111,7 @@ class MailClient:
             msg["From"] = self.email_user
             msg["To"] = to_email
             
+            print(f"SMTP: Connecting to {self.smtp_server}:587 for recipient {to_email}...")
             with smtplib.SMTP(self.smtp_server, 587, timeout=15) as server:
                 server.starttls() # Secure the connection
                 server.login(self.email_user, self.email_pass)
