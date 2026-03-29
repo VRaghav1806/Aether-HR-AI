@@ -1,7 +1,8 @@
 import imaplib
 import email
 import socket
-import resend
+import sendgrid
+from sendgrid.helpers.mail import Mail, Email, To, Content
 from email.header import decode_header
 import os
 import asyncio
@@ -16,14 +17,15 @@ class MailClient:
         self.imap_server = os.getenv("EMAIL_IMAP_SERVER", "imap.gmail.com")
         self.email_user = os.getenv("EMAIL_USER", "")
         self.email_pass = os.getenv("EMAIL_PASS", "") # App Password (for IMAP)
-        self.resend_api_key = os.getenv("RESEND_API_KEY", "")
+        self.sg_api_key = os.getenv("SENDGRID_API_KEY", "")
+        self.sg_sender = os.getenv("SENDGRID_SENDER", "")
         self.last_error = None
         
-        if self.resend_api_key:
-            resend.api_key = self.resend_api_key
+        if self.sg_api_key:
+            self.sg_client = sendgrid.SendGridAPIClient(api_key=self.sg_api_key)
         
     def is_configured(self):
-        return bool(self.email_user and self.email_pass and self.resend_api_key)
+        return bool(self.email_user and self.email_pass and self.sg_api_key and self.sg_sender)
 
     def get_new_emails(self) -> List[Dict]:
         """Poll the inbox for unread HR emails."""
@@ -102,32 +104,27 @@ class MailClient:
             return []
 
     def send_email(self, to_email: str, subject: str, body: str):
-        """Send an email using Resend (HTTP API)."""
-        if not self.resend_api_key:
-            print(f"Resend Error: API Key missing. Not sending mail to {to_email}.")
+        """Send an email using SendGrid (HTTP API)."""
+        if not self.sg_api_key or not self.sg_sender:
+            print(f"SendGrid Error: API Key or Sender missing. Not sending mail to {to_email}.")
             return
 
         try:
-            # Determine from address. If the user has a verified domain,
-            # they should update this. Defaulting to onboarding@resend.dev.
-            from_email = "onboarding@resend.dev"
-            
-            # If the user's email is on their own domain and verified, use it.
-            # For now, we'll prefix with 'onboarding' for safety in testing.
-            
-            params = {
-                "from": from_email,
-                "to": to_email,
-                "subject": subject,
-                "text": body,
-            }
+            from_email = Email(self.sg_sender)
+            to_email_obj = To(to_email)
+            content = Content("text/plain", body)
+            mail = Mail(from_email, to_email_obj, subject, content)
 
-            print(f"RESEND: Attempting to send email via HTTP API to {to_email}...")
-            response = resend.Emails.send(params)
-            print(f"RESEND: Successfully sent email. ID: {response.get('id', 'Unknown')}")
+            print(f"SENDGRID: Attempting to send email via HTTP API to {to_email}...")
+            response = self.sg_client.client.mail.send.post(request_body=mail.get())
+            
+            if response.status_code >= 200 and response.status_code < 300:
+                print(f"SENDGRID: Successfully sent email. Status: {response.status_code}")
+            else:
+                print(f"SENDGRID Error: Status Code {response.status_code}. Response: {response.body}")
             
         except Exception as e:
-            print(f"RESEND Error: {type(e).__name__}: {e}")
+            print(f"SENDGRID Error: {type(e).__name__}: {e}")
 
     def send_reply(self, to_email: str, subject: str, body: str):
         """Send an automated HR response."""
